@@ -14,7 +14,11 @@ const COLORS = [
   '#7986cb', // J - indigo
   '#ffb74d', // L - orange
   '#00ffff', // BOMB - electric cyan
+  '#ff2ad1', // N - tuerca (rosa eléctrico)
 ];
+
+const NUT = 8;
+const NUT_CHANCE = 0.04; // la tuerca es rara: ~1 de cada 25 piezas
 
 const PIECES = [
   null,
@@ -26,7 +30,10 @@ const PIECES = [
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
   [[8]],                                       // BOMB - single block
+  [[8,8,8],[8,0,8],[8,8,8]],                  // N - tuerca: anillo con hueco central
 ];
+
+const REGULAR_TYPES = 7; // las 7 piezas clásicas; la tuerca se sortea aparte
 
 const LINE_SCORES = [0, 100, 300, 500, 800];
 
@@ -42,7 +49,7 @@ const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 
-let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let board, holes, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -67,6 +74,17 @@ function randomPiece() {
   const roll = Math.random();
   const type = (roll < bombChance) ? 8 : Math.floor(Math.random() * 7) + 1;
 
+function createHoles() {
+  return Array.from({ length: ROWS }, () => new Array(COLS).fill(false));
+}
+
+function randomType() {
+  if (Math.random() < NUT_CHANCE) return NUT;
+  return Math.floor(Math.random() * REGULAR_TYPES) + 1;
+}
+
+function randomPiece() {
+  const type = randomType();
   const shape = PIECES[type].map(row => [...row]);
   return { type, shape, x: Math.floor(COLS / 2) - Math.floor(shape[0].length / 2), y: 0 };
 }
@@ -106,10 +124,27 @@ function tryRotate() {
 }
 
 function merge() {
-  for (let r = 0; r < current.shape.length; r++)
-    for (let c = 0; c < current.shape[r].length; c++)
-      if (current.shape[r][c])
-        board[current.y + r][current.x + c] = current.shape[r][c];
+  for (let r = 0; r < current.shape.length; r++) {
+    const y = current.y + r;
+    if (y < 0) continue; // la pieza puede asomar por encima del tablero
+    for (let c = 0; c < current.shape[r].length; c++) {
+      const x = current.x + c;
+      const value = current.shape[r][c];
+      if (value) {
+        board[y][x] = value;
+        holes[y][x] = false; // un bloque real tapa un hueco de tuerca previo
+      } else if (current.type === NUT) {
+        holes[y][x] = true; // en la tuerca el único 0 es el centro
+      }
+    }
+  }
+}
+
+// Una fila cuenta como completa si sus únicas celdas vacías son huecos de tuerca.
+function isRowComplete(r) {
+  for (let c = 0; c < COLS; c++)
+    if (!board[r][c] && !holes[r][c]) return false;
+  return true;
 }
 
 function explodeBomb() {
@@ -138,9 +173,11 @@ function explodeBomb() {
 function clearLines() {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
-    if (board[r].every(v => v !== 0)) {
+    if (isRowComplete(r)) {
       board.splice(r, 1);
       board.unshift(new Array(COLS).fill(0));
+      holes.splice(r, 1);
+      holes.unshift(new Array(COLS).fill(false));
       cleared++;
       r++;
     }
@@ -330,6 +367,7 @@ function loop(ts) {
 
 function init() {
   board = createBoard();
+  holes = createHoles();
   score = 0;
   lines = 0;
   level = 1;
