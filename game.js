@@ -17,7 +17,8 @@ const COLORS = [
   '#ff2ad1', // N - tuerca (rosa eléctrico)
 ];
 
-const NUT = 8;
+const BOMB = 8;
+const NUT = 9;
 const NUT_CHANCE = 0.04; // la tuerca es rara: ~1 de cada 25 piezas
 
 const PIECES = [
@@ -30,7 +31,7 @@ const PIECES = [
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
   [[8]],                                       // BOMB - single block
-  [[8,8,8],[8,0,8],[8,8,8]],                  // N - tuerca: anillo con hueco central
+  [[9,9,9],[9,0,9],[9,9,9]],                  // N - tuerca: anillo con hueco central
 ];
 
 const REGULAR_TYPES = 7; // las 7 piezas clásicas; la tuerca se sortea aparte
@@ -65,21 +66,21 @@ function getBoardFullness() {
   return filled / (ROWS * COLS);
 }
 
-function randomPiece() {
-  const fullness = getBoardFullness();
-
-  // Bomb spawn: 1% base → 15% when 70%+ full
-  const bombChance = Math.min(0.01 + (fullness * 0.20), 0.15);
-
-  const roll = Math.random();
-  const type = (roll < bombChance) ? 8 : Math.floor(Math.random() * 7) + 1;
-
 function createHoles() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(false));
 }
 
 function randomType() {
+  const fullness = getBoardFullness();
+
+  // Bomb: 1% base → 15% cuando tablero ≥70% lleno
+  const bombChance = Math.min(0.01 + (fullness * 0.20), 0.15);
+
+  const roll = Math.random();
+
+  if (roll < bombChance) return BOMB;
   if (Math.random() < NUT_CHANCE) return NUT;
+
   return Math.floor(Math.random() * REGULAR_TYPES) + 1;
 }
 
@@ -215,7 +216,7 @@ function softDrop() {
 }
 
 function lockPiece() {
-  const isBomb = (current.type === 8);
+  const isBomb = (current.type === BOMB);
 
   merge();
 
@@ -246,7 +247,7 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
   context.globalAlpha = alpha ?? 1;
 
-  if (colorIndex === 8) {
+  if (colorIndex === BOMB) {
     // BOMB: radial gradient cyan→magenta
     const cx = x * size + size / 2;
     const cy = y * size + size / 2;
