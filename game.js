@@ -13,6 +13,7 @@ const COLORS = [
   '#e57373', // Z - red
   '#7986cb', // J - indigo
   '#ffb74d', // L - orange
+  '#00ffff', // BOMB - electric cyan
   '#ff2ad1', // N - tuerca (rosa eléctrico)
 ];
 
@@ -28,6 +29,7 @@ const PIECES = [
   [[5,5,0],[0,5,5],[0,0,0]],                  // Z
   [[6,0,0],[6,6,6],[0,0,0]],                  // J
   [[0,0,7],[7,7,7],[0,0,0]],                  // L
+  [[8]],                                       // BOMB - single block
   [[8,8,8],[8,0,8],[8,8,8]],                  // N - tuerca: anillo con hueco central
 ];
 
@@ -52,6 +54,25 @@ let board, holes, current, next, score, lines, level, paused, gameOver, lastTime
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 }
+
+function getBoardFullness() {
+  let filled = 0;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c] !== 0) filled++;
+    }
+  }
+  return filled / (ROWS * COLS);
+}
+
+function randomPiece() {
+  const fullness = getBoardFullness();
+
+  // Bomb spawn: 1% base → 15% when 70%+ full
+  const bombChance = Math.min(0.01 + (fullness * 0.20), 0.15);
+
+  const roll = Math.random();
+  const type = (roll < bombChance) ? 8 : Math.floor(Math.random() * 7) + 1;
 
 function createHoles() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(false));
@@ -126,6 +147,29 @@ function isRowComplete(r) {
   return true;
 }
 
+function explodeBomb() {
+  const centerX = current.x;
+  const centerY = current.y;
+
+  let cleared = 0;
+
+  // Clear 3x3 area centered on bomb
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const tx = centerX + dx;
+      const ty = centerY + dy;
+
+      if (tx >= 0 && tx < COLS && ty >= 0 && ty < ROWS) {
+        if (board[ty][tx] !== 0) cleared++;
+        board[ty][tx] = 0;
+      }
+    }
+  }
+
+  score += cleared * 50;
+  updateHUD();
+}
+
 function clearLines() {
   let cleared = 0;
   for (let r = ROWS - 1; r >= 0; r--) {
@@ -171,7 +215,14 @@ function softDrop() {
 }
 
 function lockPiece() {
+  const isBomb = (current.type === 8);
+
   merge();
+
+  if (isBomb) {
+    explodeBomb();
+  }
+
   clearLines();
   spawn();
 }
@@ -193,13 +244,32 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+
+  if (colorIndex === 8) {
+    // BOMB: radial gradient cyan→magenta
+    const cx = x * size + size / 2;
+    const cy = y * size + size / 2;
+    const radius = (size - 2) / 2;
+
+    const grad = context.createRadialGradient(cx, cy, 0, cx, cy, radius);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.4, '#00ffff');
+    grad.addColorStop(0.8, '#ff00ff');
+    grad.addColorStop(1, 'rgba(255,0,255,0.3)');
+
+    context.fillStyle = grad;
+    context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+  } else {
+    // Standard block
+    const color = COLORS[colorIndex];
+    context.fillStyle = color;
+    context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
+    // highlight
+    context.fillStyle = 'rgba(255,255,255,0.12)';
+    context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  }
+
   context.globalAlpha = 1;
 }
 
