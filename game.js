@@ -17,6 +17,58 @@ const COLORS = [
   '#ff2ad1', // N - tuerca (rosa eléctrico)
 ];
 
+const THEMES = {
+  retro: {
+    name: 'Retro',
+    colors: [null, '#4dd0e1', '#ffd54f', '#ba68c8', '#81c784', '#e57373', '#7986cb', '#ffb74d', '#00ffff', '#ff2ad1'],
+    gridColor: '#22222e',
+    bgPrimary: '#0f0f17',
+    bgCanvas: '#1a1a25',
+    border: '#2a2a3a',
+    textPrimary: '#7aa2f7',
+    textLabel: '#555570',
+    accent: '#7aa2f7'
+  },
+  neon: {
+    name: 'Neon',
+    colors: [null, '#00ff00', '#ffff00', '#ff00ff', '#00ffff', '#ff0088', '#88ff00', '#ff6600', '#00ffff', '#ff00ff'],
+    gridColor: '#000000',
+    bgPrimary: '#000000',
+    bgCanvas: '#000000',
+    border: '#00ff00',
+    textPrimary: '#00ff00',
+    textLabel: '#00aa00',
+    accent: '#00ff00',
+    shadowBlur: 10
+  },
+  pastel: {
+    name: 'Pastel',
+    colors: [null, '#a8e6cf', '#ffd3b6', '#ffaaa5', '#ff8b94', '#ffd4d4', '#c8b8ff', '#ffc8dd', '#a8e6cf', '#ffaaa5'],
+    gridColor: '#e0e0d0',
+    bgPrimary: '#f5f5e8',
+    bgCanvas: '#fffbf0',
+    border: '#d0d0c0',
+    textPrimary: '#6b7280',
+    textLabel: '#9ca3af',
+    accent: '#fbbf24'
+  },
+  pixelart: {
+    name: 'Pixel Art',
+    colors: [null, '#4dd0e1', '#ffd54f', '#ba68c8', '#81c784', '#e57373', '#7986cb', '#ffb74d', '#00ffff', '#ff2ad1'],
+    gridColor: '#181820',
+    bgPrimary: '#0f0f17',
+    bgCanvas: '#1a1a25',
+    border: '#2a2a3a',
+    textPrimary: '#7aa2f7',
+    textLabel: '#555570',
+    accent: '#7aa2f7',
+    pattern: true
+  }
+};
+
+let currentTheme = 'retro';
+let gridColor = '#22222e';
+
 const BOMB = 8;
 const NUT = 9;
 const NUT_CHANCE = 0.04; // la tuerca es rara: ~1 de cada 25 piezas
@@ -243,6 +295,33 @@ function updateHUD() {
   levelEl.textContent = level;
 }
 
+function applyTheme(themeKey) {
+  if (!THEMES[themeKey]) return;
+
+  const theme = THEMES[themeKey];
+  currentTheme = themeKey;
+  gridColor = theme.gridColor;
+
+  // Update COLORS array
+  COLORS.splice(1, COLORS.length - 1, ...theme.colors.slice(1));
+
+  // Set CSS variables
+  const root = document.documentElement;
+  root.style.setProperty('--bg-primary', theme.bgPrimary);
+  root.style.setProperty('--bg-canvas', theme.bgCanvas);
+  root.style.setProperty('--border', theme.border);
+  root.style.setProperty('--text-primary', theme.textPrimary);
+  root.style.setProperty('--text-label', theme.textLabel);
+  root.style.setProperty('--accent', theme.accent);
+
+  // Save preference (with error handling for private browsing)
+  try {
+    localStorage.setItem('tetris_theme', themeKey);
+  } catch (e) {
+    // localStorage not available (private browsing, etc.)
+  }
+}
+
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
   context.globalAlpha = alpha ?? 1;
@@ -275,7 +354,7 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -367,6 +446,15 @@ function loop(ts) {
 }
 
 function init() {
+  // Load theme from localStorage (with error handling for private browsing)
+  let saved = 'retro';
+  try {
+    saved = localStorage.getItem('tetris_theme') || 'retro';
+  } catch (e) {
+    // localStorage not available (private browsing, etc.)
+  }
+  applyTheme(saved);
+
   board = createBoard();
   holes = createHoles();
   score = 0;
